@@ -19,7 +19,7 @@ if "history" not in st.session_state:
     st.session_state["history"] = []
 
 # 加载Hugging Face模型
-@st.cache_resource(show=True)
+@st.cache_resource(show_spinner=True)  # 修正参数为 show_spinner=True
 def load_huggingface_model():
     st.info("正在从Hugging Face加载模型，请稍候...")
     try:
