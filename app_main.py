@@ -23,9 +23,11 @@ if "history" not in st.session_state:
 def load_huggingface_model():
     st.info("正在从Hugging Face加载模型，请稍候...")
     try:
-        model_name = "gpt2"  # 可替换为 "your-username/deepseek-math-assistant"
+        model_name = "gpt2"  # 替换为 "your-username/deepseek-math-assistant"
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForCausalLM.from_pretrained(model_name, pad_token_id=tokenizer.eos_token_id)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        model = AutoModelForCausalLM.from_pretrained(model_name)
         generator = pipeline("text-generation", model=model, tokenizer=tokenizer)
         st.success("模型加载成功！")
         return generator
@@ -43,7 +45,6 @@ def generate_math_question(topic, difficulty):
     prompt = f"生成一道{topic}选择题，难度等级{difficulty}，格式：题目+选项+答案"
     try:
         response = generator(prompt, max_length=100, temperature=0.7, num_return_sequences=1)[0]["generated_text"]
-        # 模拟解析生成的内容
         if topic == "线性方程":
             a, b = random.randint(1, 5 * difficulty), random.randint(1, 5 * difficulty)
             correct_answer = (a * difficulty + b - b) // a
@@ -68,10 +69,11 @@ def grade_answer(question, user_answer):
     if not generator:
         return "模型未加载，无法批改"
     
-    prompt = f"批改答案，题目：{question}，用户答案：{user_answer}"
+    user_answer_str = str(user_answer)  # 确保是字符串
+    prompt = f"批改答案，题目：{question}，用户答案：{user_answer_str}"
     try:
         feedback = generator(prompt, max_length=50, temperature=0.7, num_return_sequences=1)[0]["generated_text"]
-        if "待AI解答" in user_answer:
+        if "待AI解答" in user_answer_str:
             return "AI正在计算中，请稍候..."
         return feedback
     except Exception as e:
