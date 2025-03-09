@@ -19,12 +19,11 @@ if "history" not in st.session_state:
     st.session_state["history"] = []
 
 # 加载Hugging Face模型
-@st.cache_resource(show_spinner=True)  # 修正参数为 show_spinner=True
+@st.cache_resource(show_spinner=True)
 def load_huggingface_model():
     st.info("正在从Hugging Face加载模型，请稍候...")
     try:
-        # 替换为您自己的模型，例如 "your-username/deepseek-math-assistant"
-        model_name = "distilbert-base-uncased"  # 示例模型，可替换
+        model_name = "gpt2"  # 可替换为 "your-username/deepseek-math-assistant"
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModelForCausalLM.from_pretrained(model_name, pad_token_id=tokenizer.eos_token_id)
         generator = pipeline("text-generation", model=model, tokenizer=tokenizer)
@@ -44,10 +43,10 @@ def generate_math_question(topic, difficulty):
     prompt = f"生成一道{topic}选择题，难度等级{difficulty}，格式：题目+选项+答案"
     try:
         response = generator(prompt, max_length=100, temperature=0.7, num_return_sequences=1)[0]["generated_text"]
-        # 模拟解析生成的内容（因distilbert非最佳生成模型，实际替换为DeepSeek更佳）
+        # 模拟解析生成的内容
         if topic == "线性方程":
             a, b = random.randint(1, 5 * difficulty), random.randint(1, 5 * difficulty)
-            correct_answer = (a * difficulty + b - b) // a  # 简化计算
+            correct_answer = (a * difficulty + b - b) // a
             question = f"{a}x + {b} = {a * difficulty + b}, x = ?"
             options = [correct_answer, correct_answer + 1, correct_answer - 1, correct_answer + 2]
         elif topic == "二次方程":
@@ -72,7 +71,6 @@ def grade_answer(question, user_answer):
     prompt = f"批改答案，题目：{question}，用户答案：{user_answer}"
     try:
         feedback = generator(prompt, max_length=50, temperature=0.7, num_return_sequences=1)[0]["generated_text"]
-        # 简单逻辑模拟（实际应基于模型训练结果）
         if "待AI解答" in user_answer:
             return "AI正在计算中，请稍候..."
         return feedback
@@ -98,7 +96,7 @@ if generate_button:
             question_data = generate_math_question(topic, difficulty)
             question_data["id"] = i
             st.session_state["questions"].append(question_data)
-        time.sleep(1)  # 模拟加载时间
+        time.sleep(1)
         st.success(f"成功生成 {num_questions} 道题目！")
 
 # 显示题目和交互
@@ -112,12 +110,10 @@ if st.session_state["questions"]:
             st.write(f"**题目 {q['id'] + 1}**: {q['text']}")
             st.write("选项：", ", ".join(map(str, q["options"])))
             
-            # 用户选择答案
             answer_key = f"answer_{q['id']}"
             selected_answer = st.selectbox("选择你的答案", q["options"], key=answer_key)
             st.session_state["user_answers"][q["id"]] = selected_answer
             
-            # 提交按钮
             if st.button("提交答案", key=f"submit_{q['id']}"):
                 feedback = grade_answer(q["text"], selected_answer)
                 st.session_state["feedback"][q["id"]] = feedback
@@ -136,12 +132,10 @@ if st.session_state["history"]:
     st.write("### 答题历史")
     st.dataframe(df)
     
-    # 统计正确率
     correct_count = sum(1 for h in st.session_state["history"] if "正确" in h["feedback"])
     total = len(st.session_state["history"])
     st.write(f"正确率：{correct_count / total * 100:.2f}%")
     
-    # 可视化
     fig, ax = plt.subplots()
     ax.pie([correct_count, total - correct_count], labels=["正确", "错误"], autopct="%1.1f%%", colors=["#66b3ff", "#ff9999"])
     st.pyplot(fig)
