@@ -41,31 +41,42 @@ def chat_with_ai(user_input):
 
 # 主界面
 st.title("AI对话助手")
-st.markdown("与AI进行实时对话，输入您的问题或请求，获取智能回答！")
+st.markdown("AI 在左侧，用户在右侧，实时对话体验！")
 
-# 对话输入和显示
-user_input = st.text_area("输入您的问题或请求", height=100)
-if st.button("发送"):
-    if user_input:
-        with st.spinner("AI思考中..."):
-            response = chat_with_ai(user_input)
-            st.session_state["chat_history"].append({"user": user_input, "ai": response})
-        st.success("对话已更新！")
-    else:
-        st.warning("请输入内容后再发送！")
+# 创建左右两列
+col1, col2 = st.columns([1, 1])
 
-# 显示聊天历史
-if st.session_state["chat_history"]:
-    st.subheader("对话历史")
-    for chat in st.session_state["chat_history"]:
-        st.markdown(f"**您**: {chat['user']}")
-        st.markdown(f"**AI**: {chat['ai']}")
-        st.markdown("---")
+# 左侧：AI回答
+with col1:
+    st.subheader("AI")
+    if st.session_state["chat_history"]:
+        for chat in st.session_state["chat_history"]:
+            st.markdown(f"**AI**: {chat['ai']}")
+            st.markdown("---")
+
+# 右侧：用户输入和历史
+with col2:
+    st.subheader("您")
+    user_input = st.text_area("输入您的问题或请求", height=100, key="user_input")
+    if st.button("发送"):
+        if user_input:
+            with st.spinner("AI思考中..."):
+                response = chat_with_ai(user_input)
+                st.session_state["chat_history"].append({"user": user_input, "ai": response})
+            st.experimental_rerun()  # 刷新页面以更新对话
+        else:
+            st.warning("请输入内容后再发送！")
+    
+    if st.session_state["chat_history"]:
+        for chat in st.session_state["chat_history"]:
+            st.markdown(f"**您**: {chat['user']}")
+            st.markdown("---")
 
 # 侧边栏：清空历史
 st.sidebar.header("工具")
 if st.sidebar.button("清空对话历史"):
     st.session_state["chat_history"] = []
     st.sidebar.success("对话历史已清空！")
+    st.experimental_rerun()
 
-st.sidebar.info("输入问题与AI对话，点击‘发送’获取回答，侧边栏可清空历史。")
+st.sidebar.info("在右侧输入问题，点击‘发送’，AI将在左侧回答。")
