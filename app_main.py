@@ -14,7 +14,7 @@ if "chat_history" not in st.session_state:
 def load_deepseek_model():
     st.info("正在从 Hugging Face 加载 DeepSeek-R1 8B 模型，请稍候...")
     try:
-        model_name = "deepseek-ai/DeepSeek-R1-8B"  # 替换为实际模型名称
+        model_name = "sesame/csm-1b"  # 替换为实际模型名称
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
