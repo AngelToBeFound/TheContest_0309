@@ -39,14 +39,16 @@ def chat_with_gemini(user_input):
     if not model:
         return "模型未加载，请输入有效的 API 密钥。"
     
-    # 构造对话上下文
+    # 修复后的对话历史格式
     history = [
         {"role": "user", "parts": [chat["user"]]},
         {"role": "model", "parts": [chat["ai"]]}
         for chat in st.session_state["chat_history"]
     ]
+    # 将历史展平为连续的列表
+    flat_history = [item for sublist in history for item in sublist]
     try:
-        chat = model.start_chat(history=history)
+        chat = model.start_chat(history=flat_history)
         response = chat.send_message(user_input)
         return response.text.strip()
     except Exception as e:
