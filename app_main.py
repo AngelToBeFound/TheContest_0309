@@ -4,6 +4,13 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass
 import logging
 
+# 设置页面配置（必须是第一个 Streamlit 命令）
+st.set_page_config(
+    page_title="Gemini 智能助手",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -62,9 +69,7 @@ class ChatUI:
     def __init__(self):
         self.state = self._initialize_state()
         self.gemini_chat = GeminiChat()
-        self._setup_page()
-        self._setup_sidebar()
-        self._create_main_layout()
+        self._setup_ui()
 
     @staticmethod
     def _initialize_state() -> ChatState:
@@ -72,14 +77,16 @@ class ChatUI:
             st.session_state.chat_state = ChatState()
         return st.session_state.chat_state
 
-    def _setup_page(self):
-        st.set_page_config(
-            page_title="Gemini 智能助手",
-            layout="wide",
-            initial_sidebar_state="expanded"
-        )
+    def _setup_ui(self):
+        # 设置标题和说明
         st.title("Gemini 智能助手")
         st.markdown("💡 基于 Google Gemini API 的新一代AI对话助手")
+        
+        # 设置侧边栏
+        self._setup_sidebar()
+        
+        # 设置主界面
+        self._create_main_layout()
 
     def _setup_sidebar(self):
         st.sidebar.header("⚙️ 设置")
@@ -90,7 +97,7 @@ class ChatUI:
         )
 
         if api_key and not self.state.api_key_valid:
-            with st.sidebar.spinner("正在验证API密钥..."):
+            with st.spinner("正在验证API密钥..."):
                 if self.gemini_chat.initialize_model(api_key):
                     self.state.api_key_valid = True
                     self.state.model = self.gemini_chat.model
