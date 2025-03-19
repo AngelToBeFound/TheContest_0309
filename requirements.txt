@@ -1,6 +1,2 @@
-streamlit
-transformers
-torch
-matplotlib
-pandas
-huggingface_hub
+streamlit>=1.10.0
+google-generativeai
