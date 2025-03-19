@@ -1,100 +1,167 @@
 import streamlit as st
 import google.generativeai as genai
+from typing import List, Dict, Optional
+from dataclasses import dataclass
+import logging
 
-# 设置页面配置
-st.set_page_config(page_title="Gemini 对话助手", layout="wide")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# 初始化会话状态
-if "chat_history" not in st.session_state:
-    st.session_state["chat_history"] = []
-if "gemini_model" not in st.session_state:
-    st.session_state["gemini_model"] = None
-if "api_key_valid" not in st.session_state:
-    st.session_state["api_key_valid"] = False
+@dataclass
+class Message:
+    role: str
+    content: str
 
-# 侧边栏：输入 API 密钥
-st.sidebar.header("设置")
-api_key = st.sidebar.text_input("输入您的 Gemini API 密钥", type="password", key="api_key_input")
+class ChatState:
+    def __init__(self):
+        self.messages: List[Dict[str, str]] = []
+        self.model: Optional[genai.GenerativeModel] = None
+        self.api_key_valid: bool = False
 
-# 初始化 Gemini 模型
-def initialize_gemini_model(api_key):
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        st.session_state["gemini_model"] = model
-        st.session_state["api_key_valid"] = True
-        st.sidebar.success("API 密钥有效，模型已加载！")
-    except Exception as e:
-        st.session_state["api_key_valid"] = False
-        st.session_state["gemini_model"] = None
-        st.sidebar.error(f"API 密钥无效或加载失败：{str(e)}")
+    def clear_history(self):
+        self.messages = []
 
-# 检查并初始化模型
-if api_key and not st.session_state["api_key_valid"]:
-    initialize_gemini_model(api_key)
+    def add_message(self, user_input: str, ai_response: str):
+        self.messages.append({"user": user_input, "ai": ai_response})
 
-# AI 对话函数
-def chat_with_gemini(user_input):
-    model = st.session_state["gemini_model"]
-    if not model:
-        return "模型未加载，请输入有效的 API 密钥。"
-    
-    # 修复后的对话历史格式
-    history = [
-        {"role": "user", "parts": [chat["user"]]},
-        {"role": "model", "parts": [chat["ai"]]}
-        for chat in st.session_state["chat_history"]
-    ]
-    # 展平历史为连续的列表
-    flat_history = [item for sublist in history for item in sublist]
-    try:
-        chat = model.start_chat(history=flat_history)
-        response = chat.send_message(user_input)
-        return response.text.strip()
-    except Exception as e:
-        return f"对话失败：{str(e)}"
+class GeminiChat:
+    def __init__(self):
+        self.model = None
 
-# 主界面
-st.title("Gemini 对话助手")
-st.markdown("基于 Google Gemini API 的智能对话，AI 在左侧，用户在右侧。")
+    def initialize_model(self, api_key: str) -> bool:
+        try:
+            genai.configure(api_key=api_key)
+            self.model = genai.GenerativeModel("gemini-1.5-flash")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize Gemini model: {e}")
+            return False
 
-# 创建左右两列
-col1, col2 = st.columns([1, 1])
+    def get_response(self, user_input: str, history: List[Dict[str, str]]) -> str:
+        if not self.model:
+            return "模型未初始化，请检查API密钥。"
 
-# 左侧：AI 回答
-with col1:
-    st.subheader("AI")
-    if st.session_state["chat_history"]:
-        for chat in st.session_state["chat_history"]:
-            st.markdown(f"**AI**: {chat['ai']}")
-            st.markdown("---")
+        try:
+            formatted_history = [
+                {"role": "user", "parts": [chat["user"]]},
+                {"role": "model", "parts": [chat["ai"]]}
+                for chat in history
+            ]
+            flat_history = [item for sublist in formatted_history for item in sublist]
+            
+            chat = self.model.start_chat(history=flat_history)
+            response = chat.send_message(user_input)
+            return response.text.strip()
+        except Exception as e:
+            error_msg = f"对话生成失败: {str(e)}"
+            logger.error(error_msg)
+            return error_msg
 
-# 右侧：用户输入和历史
-with col2:
-    st.subheader("您")
-    if not st.session_state["api_key_valid"]:
-        st.warning("请在侧边栏输入有效的 Gemini API 密钥以开始对话。")
-    else:
-        user_input = st.text_area("输入您的问题或请求", height=100, key="user_input")
-        if st.button("发送"):
-            if user_input:
-                with st.spinner("Gemini 思考中..."):
-                    response = chat_with_gemini(user_input)
-                    st.session_state["chat_history"].append({"user": user_input, "ai": response})
-                st.experimental_rerun()
-            else:
+class ChatUI:
+    def __init__(self):
+        self.state = self._initialize_state()
+        self.gemini_chat = GeminiChat()
+        self._setup_page()
+        self._setup_sidebar()
+        self._create_main_layout()
+
+    @staticmethod
+    def _initialize_state() -> ChatState:
+        if "chat_state" not in st.session_state:
+            st.session_state.chat_state = ChatState()
+        return st.session_state.chat_state
+
+    def _setup_page(self):
+        st.set_page_config(
+            page_title="Gemini 智能助手",
+            layout="wide",
+            initial_sidebar_state="expanded"
+        )
+        st.title("Gemini 智能助手")
+        st.markdown("💡 基于 Google Gemini API 的新一代AI对话助手")
+
+    def _setup_sidebar(self):
+        st.sidebar.header("⚙️ 设置")
+        api_key = st.sidebar.text_input(
+            "Gemini API 密钥",
+            type="password",
+            help="请输入您的 Gemini API 密钥以开始对话"
+        )
+
+        if api_key and not self.state.api_key_valid:
+            with st.sidebar.spinner("正在验证API密钥..."):
+                if self.gemini_chat.initialize_model(api_key):
+                    self.state.api_key_valid = True
+                    self.state.model = self.gemini_chat.model
+                    st.sidebar.success("✅ API密钥验证成功！")
+                else:
+                    st.sidebar.error("❌ API密钥无效或验证失败")
+
+        if st.sidebar.button("🗑️ 清空对话历史", help="点击清除所有对话记录"):
+            self.state.clear_history()
+            st.sidebar.success("已清空对话历史！")
+            st.experimental_rerun()
+
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 💡 使用说明")
+        st.sidebar.markdown("""
+        1. 输入 Gemini API 密钥
+        2. 在右侧输入框中输入问题
+        3. 点击发送或按回车键
+        4. AI 回答将显示在左侧
+        """)
+
+    def _create_main_layout(self):
+        col1, col2 = st.columns([1, 1])
+
+        # AI回复区域
+        with col1:
+            st.subheader("🤖 AI 回复")
+            self._display_ai_messages()
+
+        # 用户输入区域
+        with col2:
+            st.subheader("👤 用户输入")
+            self._handle_user_input()
+            self._display_user_messages()
+
+    def _display_ai_messages(self):
+        for msg in self.state.messages:
+            with st.chat_message("assistant"):
+                st.markdown(msg["ai"])
+
+    def _display_user_messages(self):
+        for msg in self.state.messages:
+            with st.chat_message("user"):
+                st.markdown(msg["user"])
+
+    def _handle_user_input(self):
+        if not self.state.api_key_valid:
+            st.warning("⚠️ 请先在侧边栏输入有效的 Gemini API 密钥")
+            return
+
+        user_input = st.text_area(
+            "输入您的问题",
+            height=100,
+            placeholder="在这里输入您的问题..."
+        )
+
+        if st.button("发送", type="primary"):
+            if not user_input:
                 st.warning("请输入内容后再发送！")
-    
-    if st.session_state["chat_history"]:
-        for chat in st.session_state["chat_history"]:
-            st.markdown(f"**您**: {chat['user']}")
-            st.markdown("---")
+                return
 
-# 侧边栏：清空历史
-st.sidebar.header("工具")
-if st.sidebar.button("清空对话历史"):
-    st.session_state["chat_history"] = []
-    st.sidebar.success("对话历史已清空！")
-    st.experimental_rerun()
+            with st.spinner("🤔 AI思考中..."):
+                response = self.gemini_chat.get_response(
+                    user_input,
+                    self.state.messages
+                )
+                self.state.add_message(user_input, response)
+            st.experimental_rerun()
 
-st.sidebar.info("在侧边栏输入 Gemini API 密钥后，右侧输入问题，AI 将在左侧回答。")
+def main():
+    chat_ui = ChatUI()
+
+if __name__ == "__main__":
+    main()
