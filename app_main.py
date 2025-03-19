@@ -45,7 +45,7 @@ def chat_with_gemini(user_input):
         {"role": "model", "parts": [chat["ai"]]}
         for chat in st.session_state["chat_history"]
     ]
-    # 将历史展平为连续的列表
+    # 展平历史为连续的列表
     flat_history = [item for sublist in history for item in sublist]
     try:
         chat = model.start_chat(history=flat_history)
