@@ -43,14 +43,14 @@ class GeminiChat:
             return "模型未初始化，请检查API密钥。"
 
         try:
-            formatted_history = [
-                {"role": "user", "parts": [chat["user"]]},
-                {"role": "model", "parts": [chat["ai"]]}
-                for chat in history
-            ]
-            flat_history = [item for sublist in formatted_history for item in sublist]
+            formatted_history = []
+            for chat in history:
+                formatted_history.extend([
+                    {"role": "user", "parts": [chat["user"]]},
+                    {"role": "model", "parts": [chat["ai"]]}
+                ])
             
-            chat = self.model.start_chat(history=flat_history)
+            chat = self.model.start_chat(history=formatted_history)
             response = chat.send_message(user_input)
             return response.text.strip()
         except Exception as e:
